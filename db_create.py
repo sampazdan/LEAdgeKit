@@ -2,9 +2,11 @@ import psycopg2
 from psycopg2 import sql
 import getpass
 import os
+import subprocess
 
 DB_NAME = "leadge_test"
 TS_NAME = "ts_leadge"
+DRIVE_LOC = "/mnt/nvme"
 
 PARAMS = {
     'user': "",
@@ -22,6 +24,15 @@ def connect():
     cursor = conn.cursor()
 
 def check_path(path):
+    print(f"Setting permissions and ownership of {path}")
+
+    try:
+        subprocess.run(("sudo", "chown", "-c", "postgres:postgres", path), check = True)
+        subprocess.run(("sudo", "chmod", "-c", "-R", "1744", path), check = True)
+    except:
+        print(f"Error setting permissions/ownership on {path}. Please run as sudo.")
+        exit(1)
+
     try:
         file = os.path.join(path, 'temp.txt')
         with open(file, 'w') as fp:
@@ -32,7 +43,7 @@ def check_path(path):
                 raise ValueError("Contents invalid")
                 
     except Exception as e:
-        print(f"File read/write error, please check permissions of {path}")
+        print(f"File read/write error, please check permissions/existence of {path}")
         exit(1)
     try:
         os.remove(file)
@@ -61,15 +72,20 @@ def pg_login():
         logged = True
      
 def create_db():
-    drive_loc = input("Enter drive location for database: ")
-    check_path(drive_loc)
+    print(f"Enter drive location for database")
+    user_loc = input("Leave blank for /mnt/nvme: ")
+    if user_loc.strip() != "":
+        global DRIVE_LOC
+        DRIVE_LOC = user_loc
+
+    check_path(DRIVE_LOC)
 
     cursor.execute("SELECT EXISTS (SELECT 1 FROM pg_tablespace WHERE spcname = %s)", (TS_NAME,))
     if not cursor.fetchone()[0]:
         print("No tablespace, creating...")
         cursor.execute(sql.SQL("CREATE TABLESPACE {} LOCATION {}").format(
             sql.Identifier(TS_NAME),
-            sql.Literal(drive_loc)
+            sql.Literal(DRIVE_LOC)
         ))
 
     conn.commit()
@@ -84,12 +100,16 @@ def create_db():
     cursor.close()
     conn.close()
 
+
+# Sets LEAdge tables for MeterEvents
 def set_tables():
+    # Log in and connect to new DB
     PARAMS['dbname'] = DB_NAME
     connect()
 
     print("Setting LEAdge DB table...")
 
+    # Create table
     cursor.execute('CREATE TABLE IF NOT EXISTS MeterEvents (\
         id SERIAL PRIMARY KEY,\
         datestamp timestamp,\
@@ -100,7 +120,7 @@ def set_tables():
     cursor.close()
     conn.close()
 
-    print(f"Successfully created database {DB_NAME} at {drive_loc}")
+    print(f"Successfully created database {DB_NAME} at {DRIVE_LOC}")
 
 
 if __name__ == "__main__":
@@ -109,4 +129,4 @@ if __name__ == "__main__":
     print("----------------------------------------------------------------")
     pg_login()
     create_db()
-    set_tables
+    set_tables()
