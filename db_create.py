@@ -4,7 +4,7 @@ import getpass
 import os
 import subprocess
 
-DB_NAME = "leadge_test"
+DB_NAME = "leadge"
 TS_NAME = "ts_leadge"
 DRIVE_LOC = "/mnt/nvme"
 
@@ -28,7 +28,7 @@ def check_path(path):
 
     try:
         subprocess.run(("sudo", "chown", "-c", "postgres:postgres", path), check = True)
-        subprocess.run(("sudo", "chmod", "-c", "-R", "1744", path), check = True)
+        subprocess.run(("sudo", "chmod", "-c", "700", path), check = True)
     except:
         print(f"Error setting permissions/ownership on {path}. Please run as sudo.")
         exit(1)
@@ -65,6 +65,7 @@ def pg_login():
             connect()
         except:
             print("Authentication failed. Please try again.")
+            print("Does leadge DB exist?")
             continue
         
         print(f"Now logged in as user {PARAMS['user']}.")
